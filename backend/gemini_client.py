@@ -2,20 +2,24 @@ import asyncio
 import httpx
 from backend.config import GEMINI_API_KEY, GEMINI_MODEL
 
-GEMINI_REST_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    f"{GEMINI_MODEL}:generateContent"
-)
+_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+
+# Ordered list of models to try.  The configured model is tried first;
+# if it 503s we automatically fall back to the next one.
+_FALLBACK_MODELS = [GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash"]
+# Deduplicate while preserving order
+_MODELS = list(dict.fromkeys(_FALLBACK_MODELS))
 
 # Retry these status codes (transient Gemini failures)
 _RETRYABLE = {429, 500, 502, 503, 504}
-_MAX_RETRIES = 3
+_MAX_RETRIES = 2  # per model
 
 
 async def generate(prompt: str, temperature: float = 0.3) -> str:
     """
     Call the Gemini REST API and return the text of the first candidate.
-    Retries up to 3 times on transient errors (429/5xx) with exponential backoff.
+    Tries the primary model first, then falls back to alternatives.
+    Retries each model up to 2 times on transient errors.
     Never leaks the API key in error messages.
     """
     payload = {
@@ -26,40 +30,49 @@ async def generate(prompt: str, temperature: float = 0.3) -> str:
         },
     }
 
-    last_error = None
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        for attempt in range(_MAX_RETRIES):
-            try:
-                resp = await client.post(
-                    GEMINI_REST_URL,
-                    params={"key": GEMINI_API_KEY},
-                    json=payload,
-                )
+    last_status = None
+    last_body = ""
 
-                if resp.status_code in _RETRYABLE and attempt < _MAX_RETRIES - 1:
-                    await asyncio.sleep(2 ** attempt)  # 1s, 2s, 4s
-                    continue
+    async with httpx.AsyncClient(timeout=55.0) as client:
+        for model in _MODELS:
+            url = f"{_BASE_URL}/{model}:generateContent"
 
-                if resp.status_code != 200:
-                    # Sanitise: never include the URL (it contains the API key)
-                    raise RuntimeError(
-                        f"Gemini API returned {resp.status_code}. "
-                        f"Response: {resp.text[:300]}"
+            for attempt in range(_MAX_RETRIES):
+                try:
+                    resp = await client.post(
+                        url,
+                        params={"key": GEMINI_API_KEY},
+                        json=payload,
                     )
 
-                data = resp.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
+                    if resp.status_code in _RETRYABLE:
+                        last_status = resp.status_code
+                        last_body = resp.text[:300]
+                        if attempt < _MAX_RETRIES - 1:
+                            await asyncio.sleep(1 * (attempt + 1))
+                            continue
+                        # Exhausted retries for this model — try next
+                        break
 
-            except httpx.HTTPError as exc:
-                last_error = exc
-                if attempt < _MAX_RETRIES - 1:
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                # Sanitise the error — strip the URL which contains the key
-                raise RuntimeError(
-                    f"Gemini API request failed after {_MAX_RETRIES} attempts: "
-                    f"{type(exc).__name__}"
-                ) from None
+                    if resp.status_code != 200:
+                        raise RuntimeError(
+                            f"Gemini API returned {resp.status_code}. "
+                            f"Response: {resp.text[:300]}"
+                        )
 
-    # Should never reach here, but just in case
-    raise RuntimeError(f"Gemini API failed after {_MAX_RETRIES} retries") from last_error
+                    data = resp.json()
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+
+                except httpx.HTTPError as exc:
+                    last_status = None
+                    last_body = f"{type(exc).__name__}"
+                    if attempt < _MAX_RETRIES - 1:
+                        await asyncio.sleep(1 * (attempt + 1))
+                        continue
+                    break  # try next model
+
+    # All models exhausted
+    raise RuntimeError(
+        f"Gemini API unavailable (tried {', '.join(_MODELS)}). "
+        f"Last status: {last_status}. {last_body}"
+    )
