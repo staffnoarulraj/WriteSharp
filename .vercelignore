@@ -19,7 +19,9 @@ frontend/.vite/
 frontend/build/
 
 # ── Streamlit / legacy requirements (Vercel must ONLY use api/requirements.txt) ──
-requirements.txt
+# Root requirements.txt was renamed to requirements-streamlit.txt so Vercel
+# won't auto-discover it.  Do NOT add a blanket "requirements.txt" pattern
+# here — it would also nuke api/requirements.txt which Vercel needs.
 requirements-streamlit.txt
 backend/requirements.txt
 
