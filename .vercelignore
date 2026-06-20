@@ -1,0 +1,34 @@
+# ── Python virtual environments ───────────────────────────────────────────────
+backend/venv/
+venv/
+.venv/
+env/
+ENV/
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+
+# ── Node / Frontend (Vercel builds these itself) ───────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/build/
+
+# ── Root-level Streamlit / legacy requirements ─────────────────────────────────
+# The root requirements.txt is for Streamlit Cloud; Vercel uses api/requirements.txt
+requirements.txt
+
+# ── Dev / OS files ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+npm-debug.log*
+.vscode/
+.idea/
+start_backend.bat
+start_frontend.bat
