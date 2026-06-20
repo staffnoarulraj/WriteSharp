@@ -4,10 +4,11 @@ from backend.config import GEMINI_API_KEY, GEMINI_MODEL
 
 _BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
-# Ordered list of models to try.  The configured model is tried first;
-# if it 5xxs we fall back to the next one.
-_FALLBACK_MODELS = [GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash"]
-_MODELS = list(dict.fromkeys(_FALLBACK_MODELS))  # deduplicate, keep order
+# Put gemini-2.5-flash first since gemini-3.5-flash is currently unreliable.
+# The configured model is included as a fallback in case it recovers.
+_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", GEMINI_MODEL]
+# Deduplicate while preserving order
+_MODELS = list(dict.fromkeys(_MODELS))
 
 # 5xx = model is down → skip to next model immediately
 _MODEL_DOWN = {500, 502, 503, 504}
@@ -18,12 +19,10 @@ async def generate(prompt: str, temperature: float = 0.3) -> str:
     Call the Gemini REST API and return the text of the first candidate.
 
     Strategy:
-    - 5xx  → immediately try the next fallback model
-    - 429  → wait and retry (all models share one API-key quota,
-             so switching models is pointless). Retries 3× with
-             increasing delays (3 s, 8 s, 15 s) to let the free-tier
-             quota window reset.
-    - Timeout → try next model
+    - Try models in order until one succeeds
+    - 5xx  → skip to next model
+    - 429  → wait and retry (all models share one API-key quota)
+    - Timeout → skip to next model
     """
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -35,15 +34,13 @@ async def generate(prompt: str, temperature: float = 0.3) -> str:
 
     last_status = None
     last_body = ""
-    hit_rate_limit = False
+    models_tried = []
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0)) as client:
+    # 25s read timeout gives the model enough time to generate;
+    # 5s connect timeout catches dead endpoints fast.
+    async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=5.0)) as client:
         for model in _MODELS:
-            # If we already know it's a 429 (quota), don't bother trying
-            # other models — they share the same quota.
-            if hit_rate_limit:
-                break
-
+            models_tried.append(model)
             url = f"{_BASE_URL}/{model}:generateContent"
 
             try:
@@ -55,8 +52,7 @@ async def generate(prompt: str, temperature: float = 0.3) -> str:
 
                 # ── 429: rate limited ──────────────────────────────────
                 if resp.status_code == 429:
-                    hit_rate_limit = True
-                    # Retry with increasing waits (3s, 8s, 15s)
+                    # All models share the same quota — wait and retry
                     for delay in [3, 8, 15]:
                         await asyncio.sleep(delay)
                         resp = await client.post(
@@ -70,14 +66,14 @@ async def generate(prompt: str, temperature: float = 0.3) -> str:
                     if resp.status_code == 429:
                         raise RuntimeError(
                             "Rate limit exceeded. The free Gemini API tier "
-                            "allows ~15 requests per minute. Please wait "
-                            "about 30-60 seconds and try again."
+                            "allows limited requests per minute. Please wait "
+                            "about 60 seconds and try again."
                         )
 
                 # ── 5xx: model is down ─────────────────────────────────
                 if resp.status_code in _MODEL_DOWN:
                     last_status = resp.status_code
-                    last_body = resp.text[:200]
+                    last_body = f"{model} returned {resp.status_code}"
                     continue  # try next model
 
                 # ── Other errors ───────────────────────────────────────
@@ -101,8 +97,8 @@ async def generate(prompt: str, temperature: float = 0.3) -> str:
                 last_body = str(exc)[:200]
                 continue  # try next model
 
-    # All models exhausted (only reached on 5xx / timeout, not 429)
+    # All models exhausted
     raise RuntimeError(
-        f"Gemini API unavailable (tried {', '.join(_MODELS)}). "
-        f"Last status: {last_status}. {last_body}"
+        f"Gemini API unavailable (tried {', '.join(models_tried)}). "
+        f"Last: {last_body}"
     )
