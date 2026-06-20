@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Moon Dust CSS Variables ─────────────────────────────────────────── */
+:root {
+  --color-light:   #D3D3FF;
+  --color-violet:  #CEB5FF;
+  --color-sky:     #8EC1DE;
+  --color-primary: #80A8FF;
+  --color-canvas:  #0B0C16;
+  --glass-bg:      rgba(255, 255, 255, 0.05);
+  --glass-border:  rgba(255, 255, 255, 0.10);
+  --glass-hover:   rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Base Reset ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--color-canvas);
+  color: #e2e8f0;
+  overflow-x: hidden;
+}
+
+/* ─── Gradient Mesh Background ─────────────────────────────────────────── */
+.gradient-mesh {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 20%,  rgba(128, 168, 255, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 90% 10%,  rgba(206, 181, 255, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(142, 193, 222, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 80% 80%,  rgba(211, 211, 255, 0.07) 0%, transparent 50%);
+  animation: meshDrift 20s ease-in-out infinite alternate;
+}
+
+@keyframes meshDrift {
+  0%   { transform: scale(1)    rotate(0deg); }
+  100% { transform: scale(1.05) rotate(1deg); }
+}
+
+/* ─── Liquid Glass Utility Classes ─────────────────────────────────────── */
+@layer components {
+  .glass {
+    @apply backdrop-blur-md border border-white/10 bg-white/5;
+  }
+
+  .glass-card {
+    @apply glass rounded-2xl p-6 shadow-xl;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300;
+  }
+  .glass-card-hover:hover {
+    background: var(--glass-hover);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(128, 168, 255, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+  }
+
+  .glass-input {
+    @apply glass rounded-xl px-4 py-3 w-full text-slate-100 placeholder-slate-500
+           focus:outline-none focus:ring-2 focus:ring-moonDust-primary/40
+           transition-all duration-200 resize-none;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .glass-btn {
+    @apply rounded-xl px-5 py-2.5 font-semibold text-sm transition-all duration-200
+           border border-white/10 backdrop-blur-sm;
+  }
+
+  .glass-btn-primary {
+    @apply glass-btn text-white;
+    background: linear-gradient(135deg, rgba(128,168,255,0.8), rgba(206,181,255,0.8));
+    box-shadow: 0 4px 16px rgba(128, 168, 255, 0.3);
+  }
+  .glass-btn-primary:hover {
+    background: linear-gradient(135deg, rgba(128,168,255,1), rgba(206,181,255,1));
+    box-shadow: 0 6px 24px rgba(128, 168, 255, 0.5);
+    transform: translateY(-1px);
+  }
+  .glass-btn-primary:active { transform: translateY(0); }
+
+  .glass-btn-secondary {
+    @apply glass-btn text-slate-300 bg-white/5;
+  }
+  .glass-btn-secondary:hover {
+    @apply text-white bg-white/10;
+    border-color: rgba(128, 168, 255, 0.4);
+  }
+
+  .moon-dust-border {
+    border: 1px solid;
+    border-image: linear-gradient(135deg, #D3D3FF, #CEB5FF, #8EC1DE, #80A8FF) 1;
+    border-radius: 1rem;
+  }
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 168, 255, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(128, 168, 255, 0.6); }
+
+/* ─── Selection ─────────────────────────────────────────────────────────── */
+::selection {
+  background: rgba(128, 168, 255, 0.3);
+  color: #fff;
+}
+
+/* ─── Diff Engine Styles ────────────────────────────────────────────────── */
+.diff-added {
+  background: rgba(128, 255, 160, 0.15);
+  color: #6ee7b7;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.diff-removed {
+  background: rgba(255, 100, 100, 0.12);
+  color: #fca5a5;
+  text-decoration: line-through;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* ─── Grammar Error Underline ───────────────────────────────────────────── */
+.grammar-error {
+  text-decoration: underline wavy #fb7185;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+.grammar-error:hover { background: rgba(251, 113, 133, 0.12); }
+
+/* ─── Tooltip ───────────────────────────────────────────────────────────── */
+.grammar-tooltip {
+  position: fixed;
+  z-index: 9999;
+  min-width: 220px;
+  max-width: 320px;
+  pointer-events: none;
+  animation: fadeInUp 0.15s ease-out both;
+}
+
+/* ─── Rudeness Meter ────────────────────────────────────────────────────── */
+.rudeness-bar {
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Score Card Animate ────────────────────────────────────────────────── */
+.score-animate {
+  animation: scoreCount 0.5s ease-out both;
+}
+
+/* ─── Page transitions ──────────────────────────────────────────────────── */
+.page-enter {
+  animation: fadeInUp 0.35s ease-out both;
+}
