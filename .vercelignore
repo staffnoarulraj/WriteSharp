@@ -18,9 +18,10 @@ frontend/dist/
 frontend/.vite/
 frontend/build/
 
-# ── Root-level Streamlit / legacy requirements ─────────────────────────────────
-# The root requirements.txt is for Streamlit Cloud; Vercel uses api/requirements.txt
+# ── Streamlit / legacy requirements (Vercel must ONLY use api/requirements.txt) ──
 requirements.txt
+requirements-streamlit.txt
+backend/requirements.txt
 
 # ── Dev / OS files ────────────────────────────────────────────────────────────
 .DS_Store
