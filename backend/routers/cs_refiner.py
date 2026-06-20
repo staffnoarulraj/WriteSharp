@@ -3,17 +3,13 @@ from pydantic import BaseModel
 from typing import List
 import json
 import re
-import google.generativeai as genai
-from backend.config import GEMINI_API_KEY, GEMINI_MODEL
-
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(GEMINI_MODEL)
+from backend.gemini_client import generate
 
 router = APIRouter()
 
 
 # ── Robust JSON extractor ─────────────────────────────────────────────────
-# gemini-3.5-flash sometimes wraps its response in ```json ... ``` fences
+# Gemini sometimes wraps its response in ```json ... ``` fences
 # or adds preamble text. This strips all of that and finds the raw JSON.
 def extract_json(text: str) -> dict:
     # 1. Strip markdown code fences (```json ... ``` or ``` ... ```)
@@ -115,14 +111,8 @@ Text to analyze:
 {req.text}"""
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="application/json",
-                temperature=0.2,
-            ),
-        )
-        data = extract_json(response.text)
+        raw = await generate(prompt, temperature=0.2)
+        data = extract_json(raw)
         return CSRefineResponse(
             verdict=data.get("verdict", "Needs Improvement"),
             rudeness_score=int(data.get("rudeness_score", 50)),

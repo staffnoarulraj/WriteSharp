@@ -1,11 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import json
-import google.generativeai as genai
-from backend.config import GEMINI_API_KEY, GEMINI_MODEL
-
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(GEMINI_MODEL)
+from backend.gemini_client import generate
 
 router = APIRouter()
 
@@ -52,17 +48,11 @@ Text to paraphrase:
 {req.text}"""
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="application/json",
-                temperature=0.7,
-            ),
-        )
-        data = json.loads(response.text)
+        raw = await generate(prompt, temperature=0.7)
+        data = json.loads(raw)
         return ParaphraseResponse(rewritten_text=data.get("rewritten_text", ""))
     except json.JSONDecodeError:
         # Fallback: return raw text if JSON parse fails
-        return ParaphraseResponse(rewritten_text=response.text.strip())
+        return ParaphraseResponse(rewritten_text=raw.strip())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")

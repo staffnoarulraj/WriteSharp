@@ -2,11 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
 import json
-import google.generativeai as genai
-from backend.config import GEMINI_API_KEY, GEMINI_MODEL
-
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(GEMINI_MODEL)
+from backend.gemini_client import generate
 
 router = APIRouter()
 
@@ -45,14 +41,8 @@ Text to summarize:
 {req.text}"""
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="application/json",
-                temperature=0.3,
-            ),
-        )
-        data = json.loads(response.text)
+        raw = await generate(prompt, temperature=0.3)
+        data = json.loads(raw)
         return SummarizeResponse(
             executive_summary=data.get("executive_summary", ""),
             key_takeaways=data.get("key_takeaways", []),
